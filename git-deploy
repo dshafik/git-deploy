@@ -1,0 +1,162 @@
+#!/usr/bin/env php
+<?php
+/**
+ * $ git deploy create [-s|--switch] --pre|post <filename> | Create a new deployment script in the current numeric namespace.
+ *	 -s|--switch: Switch to the deployment edit branch
+ * $ git deploy edit | Switch to the current deployment editing branch
+ * $ git deploy build|reintegrate [branch] | Freeze a deployment branch and merge into the current branch or [branch]
+ * $ git deploy install | Run all deployment scripts, first all pre scripts, then all post scripts.
+ * 
+ * @todo All arg handling is hacky, re-do with proper handling
+ */
+
+//var_dump($_SERVER['argv']); 
+
+if (!isset($_SERVER['argv'][1])) {
+	exit;
+}
+
+$git_deploy = new GitDeploy();
+
+switch (strtolower($_SERVER['argv'][1])) {
+	/* git-deploy commands */
+	case 'create':
+		$git_deploy->create($_SERVER['argv']);
+		break;
+	case 'edit':
+		
+		break;
+	case 'build':
+	case 'reintegrate':
+		
+		break;
+	case 'install':
+		
+		break;
+	
+	/* Actual git commands to run on the sub-branch */
+	default:
+		
+}
+
+class GitDeploy {
+	protected $deploy_path;
+	
+	protected $user;
+	
+	public function __construct()
+	{
+		// Get the repo top-level
+		$top_level = trim(`git rev-parse --show-toplevel`);
+		
+		// Get the deploy path
+		$this->deploy_path = trim(`git config deploy.path`) ?: $top_level . DIRECTORY_SEPARATOR . 'deploy';
+		$this->deploy_path = realpath($this->deploy_path);
+		
+		if (strpos($this->deploy_path, $top_level) !== 0) {
+			echo "Deploy path ({$this->deploy_path}) is not contained within the repository ({$top_level})" . PHP_EOL;
+		}
+		
+		if (!file_exists($this->deploy_path)) {
+			mkdir($this->deploy_path, 0775);
+		}
+		
+		$this->user = $_SERVER['USER'];
+	}
+	
+	public function getBranch()
+	{
+		
+	}
+	
+	public function create($args)
+	{
+		$current_dirs = glob($this->deploy_path . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
+		
+		if (!$current_dirs) {
+			$latest = 0;
+		} else {
+			$latest = -1;
+			foreach ($current_dirs as $dir) {
+				$deployment = (int) basename($dir);
+				if ($deployment > $latest) {
+					$latest = $deployment;
+				}
+			}
+		}
+		
+		$branch = "{$this->user}-deploy-{$latest}";
+		$branches = explode(PHP_EOL, trim(`git branch`));
+		
+		// Check for, or create branch
+		
+		$dir = $this->deploy_path . DIRECTORY_SEPARATOR . $latest;
+		
+		// If a branch doesn't exist for the latest deploy directory, we move to the next number
+		if (!in_array($branch, $branches) && !in_array("* $branch", $branches)) {
+			$latest++;
+			$dir = $this->deploy_path . DIRECTORY_SEPARATOR . $latest;
+			
+			$branch = "{$this->user}-deploy-{$latest}";
+			
+			echo "Creating new deploy branch: $branch" . PHP_EOL;
+			
+			`git branch $branch`;
+			mkdir($dir);
+			mkdir($dir . DIRECTORY_SEPARATOR . 'pre');
+			file_put_contents($dir . DIRECTORY_SEPARATOR . 'pre' . DIRECTORY_SEPARATOR . 'empty', '');
+			
+			mkdir($dir . DIRECTORY_SEPARATOR . 'post');
+			file_put_contents($dir . DIRECTORY_SEPARATOR . 'post' . DIRECTORY_SEPARATOR . 'empty', '');
+		}
+		
+		`git checkout $branch`;
+		
+		if (in_array('--pre', $args)) {
+			$sub_dir = 'pre';
+		} else {
+			$sub_dir = 'post';
+		}
+		
+		$files = glob($dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . '*');
+		if (!$files) {
+			$file_index = 1;
+		} else {
+			$file_index = -1;
+			foreach ($files as $filepath) {
+				$file = basename($filepath);
+				$index = substr($file, 0, strpos($file, '-'));
+				if ($file_index < $index) {
+					$file_index = $index;
+				}
+			}
+			
+			$file_index++;
+		}
+		
+		$file_path = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . $file_index . '-' . $args[3];
+		$empty_file = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . 'empty';
+		echo "Creating new deploy file: $file_path" . PHP_EOL;
+		if (file_exists($empty_file)) {
+			unlink($empty_file);
+		}
+		file_put_contents($file_path, '');
+	}
+	
+	public function edit()
+	{
+		
+	}
+	
+	public function build()
+	{
+		
+	}
+	
+	public function install()
+	{
+		
+	}
+}
+
+?>
