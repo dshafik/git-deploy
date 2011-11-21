@@ -349,4 +349,81 @@ class CLImaxEnvironmentOption extends CLIMax_BaseCommand
         return 0;
     }
 }
+
+class CLIMax {
+	static $colors = array(
+		'foreground' => array(
+			'black' => '0;30',
+			'dark gray' => '1;30',
+			'blue' => '0;34',
+			'light blue' => '1;34',
+			'green' => '0;32',
+			'light green' => '1;32',
+			'cyan' => '0;36',
+			'light cyan' => '1;36',
+			'red' => '0;31',
+			'light red' => '1;31',
+			'purple' => '0;35',
+			'light purple' => '1;35',
+			'brown' => '0;33',
+			'yellow' => '1;33',
+			'light gray' => '0;37',
+			'white' => '1;37',
+		),
+		'background' => array(
+			'black' => '40',
+			'red' => '41',
+			'green' => '42',
+			'yellow' => '43',
+			'blue' => '44',
+			'magenta' => '45',
+			'cyan' => '46',
+			'light gray' => '47',
+		),
+	);
+
+	static public function println($string)
+	{
+		echo $string . PHP_EOL;
+	}
+	
+	static public function out($string)
+	{
+		echo $string;
+	}
+	
+	static public function color($string, $foreground = null, $background = null)
+	{
+		$colored_string = "";
+ 
+		// Check if given foreground color found
+		if (isset(self::$colors['foreground'][$foreground])) {
+			$colored_string .= "\033[" . self::$colors['foreground'][$foreground] . "m";
+		}
+		// Check if given background color found
+		if (isset(self::$colors['background'][$background])) {
+			$colored_string .= "\033[" . self::$colors['background'][$background] . "m";
+		}
+
+		// Add string and end coloring
+		$colored_string .=  $string . "\033[0m";
+
+		return $colored_string;
+	}
+	
+	static public function printError($string)
+	{
+		fwrite(STDERR, ('['. self::color('!!', 'red').  '] ' . $string . PHP_EOL));
+	}
+	
+	static public function printWarning($string)
+	{
+		fwrite(STDERR, '['. self::color('W', 'yellow').  '] ' . $string . PHP_EOL);
+	}
+	
+	static public function printSuccess($string)
+	{
+		fwrite(STDERR, '['. self::color('OK', 'green').  '] ' . $string . PHP_EOL);
+	}
+}
 ?>
