@@ -69,6 +69,24 @@ class GitDeploy {
 		return $path;
 	}
 	
+	public function getMetaPath()
+	{
+		$repo_path = $this->getRepoPath();
+		
+		$path = trim(`git config deploy.meta`) ?: $repo_path . DIRECTORY_SEPARATOR . 'meta';
+		
+		if (!file_exists($path) && file_exists(dirname($path))) {
+			mkdir($path, 0775);
+		} elseif (!file_exists(dirname($path))) {
+			CLIMax::printError("Meta parent path not found (" .dirname($path). ")");
+			die(-1);
+		}
+		
+		$path = realpath($path);
+		
+		return $path;
+	}
+	
 	public function getCurrentUser()
 	{
 		return $_SERVER['USER'];
