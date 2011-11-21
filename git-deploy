@@ -55,14 +55,14 @@ class GitDeploy {
 		if (!file_exists($path) && file_exists(dirname($path))) {
 			mkdir($path, 0775);
 		} elseif (!file_exists(dirname($path))) {
-			echo "Deploy parent path not found (" .dirname($path). ")" . PHP_EOL;
+			CLIMax::printError("Deploy parent path not found (" .dirname($path). ")");
 			die(-1);
 		}
 		
 		$path = realpath($path);
 		
 		if (strpos($path, $repo_path) !== 0) {
-			echo "Deploy path ($path) is not contained within the repository ($repo_path)" . PHP_EOL;
+			CLIMax::printError("Deploy path ($path) is not contained within the repository ($repo_path)");
 			die(-1);
 		}
 		
@@ -187,7 +187,7 @@ abstract class GitDeployBaseCommand extends CLIMax_BaseCommand {
 		$this->git = new GitDeploy;
 		
 		if ($this->git->isDirtyRepo()) {
-			echo "You must commit or unstage any staged changes before using git-deploy." . PHP_EOL;
+			CLIMax::printError("You must commit or unstage any staged changes before using git-deploy.");
 			die(-1);
 		}
 	}
@@ -280,7 +280,7 @@ class GitDeployCreate extends GitDeployBaseCommand {
 		foreach ($this->arguments as $arg) {
 			foreach ($arg['aliases'] as $alias) {
 				if ($filename == $alias) {
-					echo "You must choose a filename." . PHP_EOL;
+					CLIMax::printError("You must choose a filename.");
 					$cliController->usage();
 					return -1;
 				}
@@ -366,7 +366,7 @@ class GitDeployBuild extends GitDeployBaseCommand {
 		} else {
 			$branch = $this->git->getCurrentBranch();
 			if (strpos($branch, 'deploy-') === 0) {
-				echo "This branch looks like a deploy branch, please specify the branch to integrate into." . PHP_EOL;
+				CLIMax::printWarning("This branch looks like a deploy branch, please specify the branch to integrate into.");
 				$cliController->usage();
 				return -1;
 			}
@@ -392,7 +392,7 @@ class GitDeployEdit extends GitDeployBaseCommand {
 	public function run($arguments, CLImaxController $cliController)
 	{
 		if (!$this->git->hasDevelopmentBranch()) {
-			echo "No deployment branch found." . PHP_EOL;
+			CLIMax::printError("No deployment branch found.");
 			$cliController->usage();
 			return -1;
 		} else {
