@@ -64,24 +64,24 @@ Switched to branch 'deploy-davey-2'
 
 $ git deploy ls-files --pre
 [W] Currently on a deploy branch. File list will reflect changes that have not been reintegrated yet.
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/1/pre/1-add-user-api-key.sql
+/path/to/deploy/1/pre/1-add-user-api-key.sql
 
 $ git deploy ls-files --post
 [W] Currently on a deploy branch. File list will reflect changes that have not been reintegrated yet.
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/1/post/1-generate-api-keys.php
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/2/post/1-clear-cache.php
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/2/post/2-clear-templates.php
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/2/post/3-update-templates.php
+/path/to/deploy/1/post/1-generate-api-keys.php
+/path/to/deploy/2/post/1-clear-cache.php
+/path/to/deploy/2/post/2-clear-templates.php
+/path/to/deploy/2/post/3-update-templates.php
 
 $ git checkout master
 Switched to branch 'master'
 
 $ git deploy ls-files --pre
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/1/pre/1-add-user-api-key.sql
+/path/to/deploy/1/pre/1-add-user-api-key.sql
 
 $ git deploy ls-files --post -t sql
 [OK] Nothing to do!
 
 $ git deploy ls-files --post -t php
-/Library/WebServer/Documents/orchestra.io/orchestrate/deploy/1/post/1-generate-api-keys.php
+/path/to/deploy/1/post/1-generate-api-keys.php
 ```
