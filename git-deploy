@@ -290,13 +290,13 @@ class GitDeployCreate extends GitDeployBaseCommand {
 		$previous_branch = $this->git->getCurrentBranch();
 		
 		if (!$this->git->hasDevelopmentBranch()) {
-			echo "Creating new deploy branch: ";
+			CLIMax::out("Creating new deploy branch: ");
 		} else {
-			echo "Using deploy branch: ";
+			CLIMax::out("Using deploy branch: ");
 		}
 		$branch = $this->git->getLatestBranch();
 		
-		echo $branch . PHP_EOL;
+		CLIMax::println($branch);
 		
 		`git checkout -q $branch`;
 		
@@ -319,7 +319,7 @@ class GitDeployCreate extends GitDeployBaseCommand {
 		
 		$file_path = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . $file_index . '-' . $filename;
 		$empty_file = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . 'empty';
-		echo "Creating new deploy file: $sub_dir/$file_index-$filename" . PHP_EOL;
+		CLIMax::println("Creating new deploy file: $sub_dir/$file_index-$filename");
 		file_put_contents($file_path, '');
 		
 		`git add $dir`;
@@ -357,7 +357,7 @@ class GitDeployBuild extends GitDeployBaseCommand {
 	{
 		if (sizeof($arguments)) {
 			$branch = escapeshellarg($arguments[0]);
-			echo "Reintegrating into: " .$branch. PHP_EOL;
+			CLIMax::println("Reintegrating into: " .$branch);
 			$output = $return = null;
 			exec("git checkout $branch", $output, $return);
 			if ($return != 0) {
@@ -370,12 +370,12 @@ class GitDeployBuild extends GitDeployBaseCommand {
 				$cliController->usage();
 				return -1;
 			}
-			echo "Reintegrating into: " .$this->git->getCurrentBranch(). PHP_EOL;
+			CLIMax::println("Reintegrating into: " .$this->git->getCurrentBranch());
 		}
 		
 		$deploy_branch = $this->git->getLatestBranch();
 		
-		echo `git rebase $deploy_branch`;
+		CLIMax::out(`git rebase $deploy_branch`);
 		
 		`git branch -D $deploy_branch`;
 		
