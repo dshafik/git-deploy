@@ -5,119 +5,302 @@
  *	 -s|--switch: Switch to the deployment edit branch
  * $ git deploy edit | Switch to the current deployment editing branch
  * $ git deploy build|reintegrate [branch] | Freeze a deployment branch and merge into the current branch or [branch]
- * $ git deploy install | Run all deployment scripts, first all pre scripts, then all post scripts.
+ * $ git deploy install [--meta-only] | Run all deployment scripts, first all pre scripts, then all post scripts.
+ * $ git deploy ls-files --pre|--post [--type|-t] | List all files [with --type] extension
  * 
  * @todo All arg handling is hacky, re-do with proper handling
  */
 
 //var_dump($_SERVER['argv']); 
 
-if (!isset($_SERVER['argv'][1])) {
-	exit;
-}
-
-$git_deploy = new GitDeploy();
-
-switch (strtolower($_SERVER['argv'][1])) {
-	/* git-deploy commands */
-	case 'create':
-		$git_deploy->create($_SERVER['argv']);
-		break;
-	case 'edit':
-		
-		break;
-	case 'build':
-	case 'reintegrate':
-		
-		break;
-	case 'install':
-		
-		break;
-	
-	/* Actual git commands to run on the sub-branch */
-	default:
-		
-}
-
+//if (!isset($_SERVER['argv'][1])) {
+//	exit;
+//}
+//
+//$git_deploy = new GitDeploy();
+//
+//switch (strtolower($_SERVER['argv'][1])) {
+//	/* git-deploy commands */
+//	case 'create':
+//		$git_deploy->create($_SERVER['argv']);
+//		break;
+//	case 'edit':
+//		
+//		break;
+//	case 'build':
+//	case 'reintegrate':
+//		
+//		break;
+//	case 'install':
+//		
+//		break;
+//	
+//	/* Actual git commands to run on the sub-branch */
+//	default:
+//		
+//}
+//
 class GitDeploy {
-	protected $deploy_path;
-	
-	protected $user;
-	
-	public function __construct()
+	public function getRepoPath()
 	{
-		// Get the repo top-level
-		$top_level = trim(`git rev-parse --show-toplevel`);
-		
-		// Get the deploy path
-		$this->deploy_path = trim(`git config deploy.path`) ?: $top_level . DIRECTORY_SEPARATOR . 'deploy';
-		$this->deploy_path = realpath($this->deploy_path);
-		
-		if (strpos($this->deploy_path, $top_level) !== 0) {
-			echo "Deploy path ({$this->deploy_path}) is not contained within the repository ({$top_level})" . PHP_EOL;
-		}
-		
-		if (!file_exists($this->deploy_path)) {
-			mkdir($this->deploy_path, 0775);
-		}
-		
-		$this->user = $_SERVER['USER'];
+		return trim(`git rev-parse --show-toplevel`);
 	}
 	
-	public function getBranch()
+	public function getDeployPath()
 	{
+		$repo_path = $this->getRepoPath();
 		
+		$path = trim(`git config deploy.path`) ?: $repo_path . DIRECTORY_SEPARATOR . 'deploy';
+		
+		if (!file_exists($path) && file_exists(dirname($path))) {
+			mkdir($path, 0775);
+		} elseif (!file_exists(dirname($path))) {
+			echo "Deploy parent path not found (" .dirname($path). ")" . PHP_EOL;
+			die(-1);
+		}
+		
+		$path = realpath($path);
+		
+		if (strpos($path, $repo_path) !== 0) {
+			echo "Deploy path ($path) is not contained within the repository ($repo_path)" . PHP_EOL;
+			die(-1);
+		}
+		
+		return $path;
 	}
 	
-	public function create($args)
+	public function getCurrentUser()
 	{
-		$current_dirs = glob($this->deploy_path . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
+		return $_SERVER['USER'];
+	}
+	
+	public function getLatestDir()
+	{
+		$branches = explode(PHP_EOL, trim(`git branch`));
 		
-		if (!$current_dirs) {
-			$latest = 0;
-		} else {
-			$latest = -1;
-			foreach ($current_dirs as $dir) {
-				$deployment = (int) basename($dir);
-				if ($deployment > $latest) {
-					$latest = $deployment;
+		$latest = 0;
+		foreach ($branches as $branch) {
+			if (strpos($branch, 'deploy-' .$this->getCurrentUser(). '-') !== false) {
+				$dir = str_replace('deploy-' .$this->getCurrentUser() . '-', '', $branch);
+				if ($latest < $dir) {
+					$latest = $dir;
 				}
 			}
 		}
 		
-		$branch = "{$this->user}-deploy-{$latest}";
+		// No current branches, check the FS
+		if ($latest == 0) {
+			$current_dirs = glob($this->getDeployPath() . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
+		
+			if (!$current_dirs) {
+				$latest = 0;
+			} else {
+				$latest = -1;
+				foreach ($current_dirs as $dir) {
+					$deployment = (int) basename($dir);
+					if ($deployment > $latest) {
+						$latest = $deployment;
+					}
+				}
+			}
+		}
+		
+		return $latest;
+	}
+	
+	public function getCurrentBranch()
+	{
+		return trim(`git name-rev --name-only HEAD`);
+	}
+	
+	public function hasDevelopmentBranch()
+	{
 		$branches = explode(PHP_EOL, trim(`git branch`));
 		
-		// Check for, or create branch
+		foreach ($branches as $branch) {
+			if (strpos($branch, "deploy-" .$this->getCurrentUser(). "-") !== false) {
+				return true;
+			}
+		}
 		
-		$dir = $this->deploy_path . DIRECTORY_SEPARATOR . $latest;
+		return false;
+	}
+	
+	public function isDirtyRepo()
+	{
+		$status = `git status`;
+		if (strpos($status, "Changes to be committed:") !== false) {
+			return true;
+		}
 		
-		// If a branch doesn't exist for the latest deploy directory, we move to the next number
-		if (!in_array($branch, $branches) && !in_array("* $branch", $branches)) {
-			$latest++;
-			$dir = $this->deploy_path . DIRECTORY_SEPARATOR . $latest;
+		return false;
+	}
+	
+	public function getLatestBranch()
+	{
+		if (!$this->hasDevelopmentBranch()) {
+			$latest = $this->getLatestDir() + 1;
+		
+			$branch = 'deploy-' . $this->getCurrentUser() . '-' . $latest;
 			
-			$branch = "{$this->user}-deploy-{$latest}";
-			
-			echo "Creating new deploy branch: $branch" . PHP_EOL;
+			$previous_branch = $this->getCurrentBranch();
 			
 			`git branch $branch`;
+			`git checkout -q $branch`;
+			
+			$dir = $this->getDeployPath() . DIRECTORY_SEPARATOR . $latest;
+			
 			mkdir($dir);
 			mkdir($dir . DIRECTORY_SEPARATOR . 'pre');
 			file_put_contents($dir . DIRECTORY_SEPARATOR . 'pre' . DIRECTORY_SEPARATOR . 'empty', '');
-			
+
 			mkdir($dir . DIRECTORY_SEPARATOR . 'post');
 			file_put_contents($dir . DIRECTORY_SEPARATOR . 'post' . DIRECTORY_SEPARATOR . 'empty', '');
-		}
-		
-		`git checkout $branch`;
-		
-		if (in_array('--pre', $args)) {
-			$sub_dir = 'pre';
+			
+			`git add $dir`;
+			`git commit -m "git-deploy: initial commit"`;
+			
+			// Switch back to the previous branch
+			`git checkout -q $previous_branch`;
 		} else {
-			$sub_dir = 'post';
+			$latest = $this->getLatestDir();
+		
+			$branch = 'deploy-' . $this->getCurrentUser() . '-' . $latest;
 		}
 		
+		return $branch;
+	}
+}
+
+require_once 'climax.php';
+
+abstract class GitDeployBaseCommand extends CLIMax_BaseCommand {
+	public $arguments;
+	
+	/**
+	 * @var GitDeploy
+	 */
+	protected $git;
+
+	public function __construct()
+	{
+		$this->git = new GitDeploy;
+		
+		if ($this->git->isDirtyRepo()) {
+			echo "You must commit or unstage any staged changes before using git-deploy." . PHP_EOL;
+			die(-1);
+		}
+	}
+	
+	public function getUsage($aliases, $argLinker)
+	{
+		// calculate arg linker string
+        switch ($this->getArgumentType()) {
+            case CLImaxCommand::ARG_NONE:
+                $argLinker = NULL;
+                break;
+            default:
+                $argLinker = "{$argLinker}<value>";
+                break;
+        }
+        $cmd = NULL;
+        foreach ($aliases as $alias) {
+            if ($cmd)
+            {
+                $cmd .= " / ";
+            }
+            $cmd .= "{$alias}{$argLinker}";
+        }
+		
+		if ($this->arguments) {
+			foreach ($this->arguments as $arg) {
+				$arg_string = implode('|', $arg['aliases']);
+
+				if (isset($arg['optional']) && $arg['optional']) {
+					$arg_string = "[$arg_string]";
+				}
+				$cmd .= "  $arg_string";
+			}
+		}
+
+        $description = $this->getDescription($aliases, $argLinker);
+        if ($description)
+        {
+            $cmd .= "\n  {$description}\n";
+        }
+
+        return $cmd;
+	}
+}
+
+class GitDeployCreate extends GitDeployBaseCommand {
+	public $arguments = array(
+		array(
+			'aliases' => array(
+				'-s',
+				'--switch-branch',
+			),
+			'optional' => true,
+			'description' => 'Switch to the current deployment branch'
+		),
+		array(
+			'aliases' => array(
+				'--pre',
+				'--post'
+			),
+			'description' => 'Create a pre or post deploy script'
+		),
+		array(
+			'aliases' => array(
+				'filename'
+			),
+			'description' => 'Filename for the new deployment script'
+		)
+	);
+	
+	public function run($arguments, CLImaxController $cliController)
+	{
+		if (in_array('--pre', $arguments) && in_array('--post', $arguments)) {
+			echo "You must use one of either --pre or --post." . PHP_EOL;
+			$cliController->usage();
+			return -1;
+		}
+		
+		if (in_array('--pre', $arguments)) {
+			$sub_dir = 'pre';
+		} elseif (in_array('--post', $arguments)) {
+			$sub_dir = 'post';
+		} else {
+			echo "You must use either --pre or --post." . PHP_EOL;
+			$cliController->usage();
+			return -1;
+		}
+		
+		$filename = array_pop($arguments);
+		foreach ($this->arguments as $arg) {
+			foreach ($arg['aliases'] as $alias) {
+				if ($filename == $alias) {
+					echo "You must choose a filename." . PHP_EOL;
+					$cliController->usage();
+					return -1;
+				}
+			}
+		}
+		
+		$previous_branch = $this->git->getCurrentBranch();
+		
+		if (!$this->git->hasDevelopmentBranch()) {
+			echo "Creating new deploy branch: ";
+		} else {
+			echo "Using deploy branch: ";
+		}
+		$branch = $this->git->getLatestBranch();
+		
+		echo $branch . PHP_EOL;
+		
+		`git checkout -q $branch`;
+		
+		$dir = $this->git->getDeployPath() . DIRECTORY_SEPARATOR . $this->git->getLatestDir();
 		$files = glob($dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . '*');
 		if (!$files) {
 			$file_index = 1;
@@ -134,29 +317,100 @@ class GitDeploy {
 			$file_index++;
 		}
 		
-		$file_path = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . $file_index . '-' . $args[3];
+		$file_path = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . $file_index . '-' . $filename;
 		$empty_file = $dir . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . 'empty';
-		echo "Creating new deploy file: $file_path" . PHP_EOL;
-		if (file_exists($empty_file)) {
-			unlink($empty_file);
-		}
+		echo "Creating new deploy file: $sub_dir/$file_index-$filename" . PHP_EOL;
 		file_put_contents($file_path, '');
+		
+		`git add $dir`;
+		if (file_exists($empty_file)) {
+			`git rm $empty_file`;
+		}
+		`git commit -m "git-deploy: Added new deployment script $file_index-$filename"`;
+		`git checkout -q $previous_branch`;
+		
+		if (in_array('--switch-branch', $arguments) || in_array('-s', $arguments)) {
+			`git checkout $branch`;
+		}
+		
+		return 0;
 	}
 	
-	public function edit()
+	public function getDescription($aliases, $argLinker)
 	{
-		
-	}
-	
-	public function build()
-	{
-		
-	}
-	
-	public function install()
-	{
-		
+		return "Create the {filename} deployment script in the current namespace. Will create a new namespace if necessary.";
 	}
 }
 
-?>
+class GitDeployBuild extends GitDeployBaseCommand {
+	public $arguments = array(
+		array(
+			'aliases' => array(
+				'reintegration branch'
+			),
+			'optional' => true,
+			'description' => 'Reintegrate current migration branch into [branch]'
+		),
+	);
+	
+	public function run($arguments, CLImaxController $cliController)
+	{
+		if (sizeof($arguments)) {
+			$branch = escapeshellarg($arguments[0]);
+			echo "Reintegrating into: " .$branch. PHP_EOL;
+			$output = $return = null;
+			exec("git checkout $branch", $output, $return);
+			if ($return != 0) {
+				return -1;
+			}
+		} else {
+			$branch = $this->git->getCurrentBranch();
+			if (strpos($branch, 'deploy-') === 0) {
+				echo "This branch looks like a deploy branch, please specify the branch to integrate into." . PHP_EOL;
+				$cliController->usage();
+				return -1;
+			}
+			echo "Reintegrating into: " .$this->git->getCurrentBranch(). PHP_EOL;
+		}
+		
+		$deploy_branch = $this->git->getLatestBranch();
+		
+		echo `git rebase $deploy_branch`;
+		
+		`git branch -D $deploy_branch`;
+		
+		return 0;
+	}
+	
+	public function getDescription($aliases, $argLinker)
+	{
+		return "Freeze a namespace and reintegrate the changes.";
+	}
+}
+
+class GitDeployEdit extends GitDeployBaseCommand {
+	public function run($arguments, CLImaxController $cliController)
+	{
+		if (!$this->git->hasDevelopmentBranch()) {
+			echo "No deployment branch found." . PHP_EOL;
+			$cliController->usage();
+			return -1;
+		} else {
+			$branch = $this->git->getLatestBranch();
+			`git checkout $branch`;
+		}
+		
+		return 0;
+	}
+	
+	public function getDescription($aliases, $argLinker)
+	{
+		return "Switch to the current deployment branch";
+	}
+}
+
+$controller =	CLImaxController::create()
+				->addCommand(new GitDeployCreate, array('create'))
+				->addCommand(new GitDeployBuild, array('build', 'reintegrate'))
+				->addCommand(new GitDeployEdit, array('edit'))
+				->run($_SERVER['argv'], $_SERVER['argc']);
