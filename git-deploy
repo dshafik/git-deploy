@@ -94,31 +94,16 @@ class GitDeploy {
 	
 	public function getLatestDir()
 	{
-		$branches = explode(PHP_EOL, trim(`git branch`));
+		$current_dirs = glob($this->getDeployPath() . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
 		
-		$latest = 0;
-		foreach ($branches as $branch) {
-			if (strpos($branch, 'deploy-' .$this->getCurrentUser(). '-') !== false) {
-				$dir = str_replace('deploy-' .$this->getCurrentUser() . '-', '', $branch);
-				if ($latest < $dir) {
-					$latest = $dir;
-				}
-			}
-		}
-		
-		// No current branches, check the FS
-		if ($latest == 0) {
-			$current_dirs = glob($this->getDeployPath() . DIRECTORY_SEPARATOR . '*', GLOB_ONLYDIR);
-		
-			if (!$current_dirs) {
-				$latest = 0;
-			} else {
-				$latest = -1;
-				foreach ($current_dirs as $dir) {
-					$deployment = (int) basename($dir);
-					if ($deployment > $latest) {
-						$latest = $deployment;
-					}
+		if (!$current_dirs) {
+			$latest = 0;
+		} else {
+			$latest = -1;
+			foreach ($current_dirs as $dir) {
+				$deployment = (int) basename($dir);
+				if ($deployment > $latest) {
+					$latest = $deployment;
 				}
 			}
 		}
