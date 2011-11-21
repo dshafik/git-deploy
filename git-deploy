@@ -415,8 +415,84 @@ class GitDeployEdit extends GitDeployBaseCommand {
 	}
 }
 
+class GitDeployLsFiles extends GitDeployBaseCommand {
+	public $arguments = array(
+		array(
+			'aliases' => array(
+				'-t',
+				'--type <extension>',
+			),
+			'optional' => true,
+			'description' => 'Filter by specified file extension'
+		),
+		array(
+			'aliases' => array(
+				'--pre',
+				'--post'
+			),
+			'description' => 'List pre or post deploy scripts'
+		),
+	);
+	
+	public function run($arguments, CLImaxController $cliController)
+	{
+		if ($this->git->getDevelopmentBranch() == $this->git->getCurrentBranch()) {
+			CLIMax::printWarning('Currently on a deploy branch. File list will reflect changes that have not been reintegrated yet.');
+		}
+		
+		$meta = $this->git->getMetaPath();
+		$latest_file = $meta . DIRECTORY_SEPARATOR . 'latest';
+		
+		if (!file_exists($latest_file)) {
+			$previous = 0;
+		} else {
+			$previous = file_get_contents($latest_file);
+		}
+		
+		$latest = $this->git->getLatestDir();
+		
+		if ($latest > $previous) {
+			$dir = $this->git->getDeployPath();
+			$sub_dir = $this->checkPrePostArgs($arguments, $cliController);
+			
+			$type = '';
+			if ((in_array('-t', $arguments) && $type_key = array_search('-t', $arguments)) || (in_array('--type', $arguments) && $type_key = array_search('--type'))) {
+				if (!isset($arguments[$type_key+1])) {
+					CLIMax::printError("You must specify an extension with type flag.");
+					return -1;
+				}
+				
+				// Create the file extension
+				$type = $arguments[$type_key+1];
+				if ($type{0} != '.') {
+					$type = ".$type";
+				}
+			}
+			
+			$files = array();
+			
+			while ($previous <= $latest) {
+				$files = array_merge($files, array_filter(glob($dir . DIRECTORY_SEPARATOR . $previous . DIRECTORY_SEPARATOR . $sub_dir . DIRECTORY_SEPARATOR . '*' . $type), function ($value) { if (basename($value) == 'empty') { return false; } return true; }));
+				$previous++;
+			}
+			
+			
+			
+			if (sizeof($files) > 0) {
+				CLIMax::println(implode(PHP_EOL, $files));
+			
+				return 0;
+			}
+		}
+		
+		CLIMax::printSuccess("Nothing to do!");
+		return -1;
+	}
+}
+
 $controller =	CLImaxController::create()
 				->addCommand(new GitDeployCreate, array('create'))
 				->addCommand(new GitDeployBuild, array('build', 'reintegrate'))
 				->addCommand(new GitDeployEdit, array('edit'))
+				->addCommand(new GitDeployLsFiles, array('ls-files'))
 				->run($_SERVER['argv'], $_SERVER['argc']);
