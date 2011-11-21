@@ -488,6 +488,11 @@ class GitDeployLsFiles extends GitDeployBaseCommand {
 		CLIMax::printSuccess("Nothing to do!");
 		return -1;
 	}
+	
+	public function getDescription($aliases, $argLinker)
+	{
+		return "List files necessary to upgrade from the currently deployed version.";
+	}
 }
 
 $controller =	CLImaxController::create()
