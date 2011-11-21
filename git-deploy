@@ -230,6 +230,27 @@ abstract class GitDeployBaseCommand extends CLIMax_BaseCommand {
 
         return $cmd;
 	}
+	
+	protected function checkPrePostArgs($arguments, CLImaxController $cliController)
+	{
+		if (in_array('--pre', $arguments) && in_array('--post', $arguments)) {
+			CLIMax::printError("You must use one of either --pre or --post.");
+			$cliController->usage();
+			die(-1);
+		}
+		
+		if (in_array('--pre', $arguments)) {
+			$sub_dir = 'pre';
+		} elseif (in_array('--post', $arguments)) {
+			$sub_dir = 'post';
+		} else {
+			CLIMax::printError("You must use either --pre or --post.");
+			$cliController->usage();
+			die(-1);
+		}
+		
+		return $sub_dir;
+	}
 }
 
 class GitDeployCreate extends GitDeployBaseCommand {
@@ -259,21 +280,7 @@ class GitDeployCreate extends GitDeployBaseCommand {
 	
 	public function run($arguments, CLImaxController $cliController)
 	{
-		if (in_array('--pre', $arguments) && in_array('--post', $arguments)) {
-			echo "You must use one of either --pre or --post." . PHP_EOL;
-			$cliController->usage();
-			return -1;
-		}
-		
-		if (in_array('--pre', $arguments)) {
-			$sub_dir = 'pre';
-		} elseif (in_array('--post', $arguments)) {
-			$sub_dir = 'post';
-		} else {
-			echo "You must use either --pre or --post." . PHP_EOL;
-			$cliController->usage();
-			return -1;
-		}
+		$sub_dir = $this->checkPrePostArgs($arguments, $cliController);
 		
 		$filename = array_pop($arguments);
 		foreach ($this->arguments as $arg) {
