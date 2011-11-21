@@ -116,13 +116,13 @@ class GitDeploy {
 		return trim(`git name-rev --name-only HEAD`);
 	}
 	
-	public function hasDevelopmentBranch()
+	public function getDevelopmentBranch()
 	{
 		$branches = explode(PHP_EOL, trim(`git branch`));
 		
 		foreach ($branches as $branch) {
 			if (strpos($branch, "deploy-" .$this->getCurrentUser(). "-") !== false) {
-				return true;
+				return str_replace('* ', '', $branch);
 			}
 		}
 		
@@ -141,7 +141,7 @@ class GitDeploy {
 	
 	public function getLatestBranch()
 	{
-		if (!$this->hasDevelopmentBranch()) {
+		if (!$branch = $this->getDevelopmentBranch()) {
 			$latest = $this->getLatestDir() + 1;
 		
 			$branch = 'deploy-' . $this->getCurrentUser() . '-' . $latest;
@@ -165,10 +165,6 @@ class GitDeploy {
 			
 			// Switch back to the previous branch
 			`git checkout -q $previous_branch`;
-		} else {
-			$latest = $this->getLatestDir();
-		
-			$branch = 'deploy-' . $this->getCurrentUser() . '-' . $latest;
 		}
 		
 		return $branch;
@@ -292,7 +288,7 @@ class GitDeployCreate extends GitDeployBaseCommand {
 		
 		$previous_branch = $this->git->getCurrentBranch();
 		
-		if (!$this->git->hasDevelopmentBranch()) {
+		if (!$this->git->getDevelopmentBranch()) {
 			CLIMax::out("Creating new deploy branch: ");
 		} else {
 			CLIMax::out("Using deploy branch: ");
@@ -394,7 +390,7 @@ class GitDeployBuild extends GitDeployBaseCommand {
 class GitDeployEdit extends GitDeployBaseCommand {
 	public function run($arguments, CLImaxController $cliController)
 	{
-		if (!$this->git->hasDevelopmentBranch()) {
+		if (!$this->git->getDevelopmentBranch()) {
 			CLIMax::printError("No deployment branch found.");
 			$cliController->usage();
 			return -1;
