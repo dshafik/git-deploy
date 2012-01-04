@@ -161,7 +161,7 @@ class GitDeploy {
 			file_put_contents($dir . DIRECTORY_SEPARATOR . 'post' . DIRECTORY_SEPARATOR . 'empty', '');
 			
 			`git add $dir`;
-			`git commit -m "git-deploy: initial commit"`;
+			`git commit -m "git-deploy: created deploy/$latest"`;
 			
 			// Switch back to the previous branch
 			`git checkout -q $previous_branch`;
