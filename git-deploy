@@ -332,7 +332,7 @@ class GitDeployCreate extends GitDeployBaseCommand {
 		if (file_exists($empty_file)) {
 			`git rm $empty_file`;
 		}
-		`git commit -m "git-deploy: Added new deployment script $file_index-$filename"`;
+		`git commit -m "git-deploy: Added new deployment script $sub_dir/$file_index-$filename"`;
 		`git checkout -q $previous_branch`;
 		
 		if (in_array('--switch-branch', $arguments) || in_array('-s', $arguments)) {
